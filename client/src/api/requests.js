@@ -24,3 +24,8 @@ export const updateRequest = async (id, data) => {
 };
 
 export const deleteRequest = (id) => apiFetch(`/requests/${id}`, { method: 'DELETE' });
+
+export const searchRequests = async (q) => {
+  const list = await apiFetch(`/requests/search?q=${encodeURIComponent(q)}`);
+  return list.map(parseRequest);
+};

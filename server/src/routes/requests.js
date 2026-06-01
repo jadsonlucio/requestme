@@ -2,6 +2,24 @@ const express = require('express');
 const db = require('../db/database');
 const router = express.Router();
 
+router.get('/requests/search', (req, res) => {
+  const q = req.query.q;
+  if (!q || !q.trim()) {
+    return res.status(400).json({ error: 'q is required' });
+  }
+  const escaped = q.trim().replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const like = `%${escaped}%`;
+  const requests = db
+    .prepare(
+      `SELECT * FROM requests
+       WHERE (name LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\')
+       ORDER BY project_id, created_at ASC
+       LIMIT 200`
+    )
+    .all(like, like);
+  res.json(requests);
+});
+
 router.get('/projects/:projectId/requests', (req, res) => {
   const requests = db
     .prepare('SELECT * FROM requests WHERE project_id = ? ORDER BY created_at ASC')

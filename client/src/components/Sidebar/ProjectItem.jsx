@@ -13,7 +13,7 @@ const METHOD_COLORS = {
   OPTIONS: 'text-gray-400',
 };
 
-export default function ProjectItem({ project, onDelete }) {
+export default function ProjectItem({ project, onDelete, filteredRequests = null }) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState(true);
   const [isAddingRequest, setIsAddingRequest] = useState(false);
@@ -22,11 +22,16 @@ export default function ProjectItem({ project, onDelete }) {
   const activeRequest = useStore((s) => s.activeRequest);
   const setActiveRequest = useStore((s) => s.setActiveRequest);
 
-  const { data: requests = [] } = useQuery({
+  const isSearching = filteredRequests !== null;
+
+  const { data: ownRequests = [] } = useQuery({
     queryKey: ['requests', project.id],
     queryFn: () => getRequests(project.id),
-    enabled: expanded,
+    enabled: !isSearching && expanded,
   });
+
+  const requests = isSearching ? filteredRequests : ownRequests;
+  const isExpanded = isSearching || expanded;
 
   const createMutation = useMutation({
     mutationFn: (name) => createRequest(project.id, { name }),
@@ -53,31 +58,33 @@ export default function ProjectItem({ project, onDelete }) {
     <div className="border-b border-gray-700">
       <div className="flex items-center justify-between px-3 py-2 hover:bg-gray-750 group">
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => !isSearching && setExpanded(!expanded)}
           className="flex items-center gap-1 text-gray-200 text-xs font-medium flex-1 text-left"
         >
-          <span className="text-gray-500">{expanded ? '▾' : '▸'}</span>
+          <span className="text-gray-500">{isExpanded ? '▾' : '▸'}</span>
           {project.name}
         </button>
-        <div className="hidden group-hover:flex gap-2 items-center">
-          <button
-            onClick={() => setIsAddingRequest(true)}
-            className="text-xs text-blue-400 hover:text-blue-300"
-          >
-            +
-          </button>
-          <button
-            onClick={onDelete}
-            className="text-xs text-red-500 hover:text-red-400"
-          >
-            ×
-          </button>
-        </div>
+        {!isSearching && (
+          <div className="hidden group-hover:flex gap-2 items-center">
+            <button
+              onClick={() => setIsAddingRequest(true)}
+              className="text-xs text-blue-400 hover:text-blue-300"
+            >
+              +
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-xs text-red-500 hover:text-red-400"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
 
-      {expanded && (
+      {isExpanded && (
         <div className="pl-4">
-          {isAddingRequest && (
+          {!isSearching && isAddingRequest && (
             <form onSubmit={handleAddRequest} className="px-2 py-1">
               <input
                 autoFocus
@@ -114,12 +121,14 @@ export default function ProjectItem({ project, onDelete }) {
                 {req.method}
               </span>
               <span className="text-gray-300 truncate flex-1">{req.name}</span>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(req.id); }}
-                className="hidden group-hover/req:block text-red-500 hover:text-red-400 shrink-0"
-              >
-                ×
-              </button>
+              {!isSearching && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(req.id); }}
+                  className="hidden group-hover/req:block text-red-500 hover:text-red-400 shrink-0"
+                >
+                  ×
+                </button>
+              )}
             </div>
           ))}
         </div>
