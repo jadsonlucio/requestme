@@ -7,11 +7,12 @@ router.get('/requests/search', (req, res) => {
   if (!q || !q.trim()) {
     return res.status(400).json({ error: 'q is required' });
   }
-  const like = `%${q.trim()}%`;
+  const escaped = q.trim().replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const like = `%${escaped}%`;
   const requests = db
     .prepare(
       `SELECT * FROM requests
-       WHERE (name LIKE ? OR url LIKE ?)
+       WHERE (name LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\')
        ORDER BY project_id, created_at ASC
        LIMIT 200`
     )

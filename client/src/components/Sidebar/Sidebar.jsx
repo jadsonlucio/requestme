@@ -22,13 +22,13 @@ export default function Sidebar() {
     queryFn: getProjects,
   });
 
-  const { data: searchResults = [] } = useQuery({
+  const { data: searchResults = [], isLoading: isSearchLoading } = useQuery({
     queryKey: ['search', debouncedQuery],
     queryFn: () => searchRequests(debouncedQuery),
     enabled: debouncedQuery.length > 0,
   });
 
-  const searchMap = debouncedQuery.length > 0
+  const searchMap = debouncedQuery.length > 0 && !isSearchLoading
     ? searchResults.reduce((m, r) => {
         if (!m.has(r.project_id)) m.set(r.project_id, []);
         m.get(r.project_id).push(r);
