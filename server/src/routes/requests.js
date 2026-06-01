@@ -2,6 +2,23 @@ const express = require('express');
 const db = require('../db/database');
 const router = express.Router();
 
+router.get('/requests/search', (req, res) => {
+  const q = req.query.q;
+  if (!q || !q.trim()) {
+    return res.status(400).json({ error: 'q is required' });
+  }
+  const like = `%${q.trim()}%`;
+  const requests = db
+    .prepare(
+      `SELECT * FROM requests
+       WHERE (name LIKE ? OR url LIKE ?)
+       ORDER BY project_id, created_at ASC
+       LIMIT 200`
+    )
+    .all(like, like);
+  res.json(requests);
+});
+
 router.get('/projects/:projectId/requests', (req, res) => {
   const requests = db
     .prepare('SELECT * FROM requests WHERE project_id = ? ORDER BY created_at ASC')
