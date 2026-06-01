@@ -50,7 +50,8 @@ function parsePostmanCollection(json) {
     let body = '';
     if (req.body) {
       if (req.body.mode === 'raw') {
-        body_type = 'raw';
+        const lang = req.body.options?.raw?.language;
+        body_type = lang === 'json' ? 'json' : 'raw';
         body = req.body.raw || '';
       } else if (req.body.mode === 'urlencoded') {
         body_type = 'form';
@@ -79,7 +80,7 @@ function parsePostmanCollection(json) {
         auth_config = {
           key: (a.apikey || []).find(p => p.key === 'key')?.value || '',
           value: (a.apikey || []).find(p => p.key === 'value')?.value || '',
-          in: 'header',
+          in: (a.apikey || []).find(p => p.key === 'in')?.value || 'header',
         };
       }
     }
@@ -89,44 +90,14 @@ function parsePostmanCollection(json) {
 
   const variables = (json.variable || []).map(v => ({ key: v.key, value: v.value || '' }));
 
-  return { projectName: json.info.name, requests, variables };
+  const projectName = json.info.name || 'Imported Collection';
+
+  return { projectName, requests, variables };
 }
 
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
-
-router.get('/projects', (req, res) => {
-  const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all();
-  res.json(projects);
-});
-
-router.post('/projects', (req, res) => {
-  const { name } = req.body;
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'name is required' });
-  }
-  const result = db.prepare('INSERT INTO projects (name) VALUES (?)').run(name.trim());
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(result.lastInsertRowid);
-  res.status(201).json(project);
-});
-
-router.put('/projects/:id', (req, res) => {
-  const { name } = req.body;
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'name is required' });
-  }
-  const result = db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(name.trim(), req.params.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'project not found' });
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
-  res.json(project);
-});
-
-router.delete('/projects/:id', (req, res) => {
-  const result = db.prepare('DELETE FROM projects WHERE id = ?').run(req.params.id);
-  if (result.changes === 0) return res.status(404).json({ error: 'project not found' });
-  res.status(204).send();
-});
 
 router.post('/projects/import', upload.single('file'), (req, res) => {
   if (!req.file) {
@@ -179,9 +150,42 @@ router.post('/projects/import', upload.single('file'), (req, res) => {
   try {
     const result = doImport();
     res.status(201).json(result);
-  } catch {
+  } catch (e) {
+    console.error('Import transaction failed:', e);
     res.status(500).json({ error: 'Import failed' });
   }
+});
+
+router.get('/projects', (req, res) => {
+  const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all();
+  res.json(projects);
+});
+
+router.post('/projects', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  const result = db.prepare('INSERT INTO projects (name) VALUES (?)').run(name.trim());
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(result.lastInsertRowid);
+  res.status(201).json(project);
+});
+
+router.put('/projects/:id', (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  const result = db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(name.trim(), req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'project not found' });
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+  res.json(project);
+});
+
+router.delete('/projects/:id', (req, res) => {
+  const result = db.prepare('DELETE FROM projects WHERE id = ?').run(req.params.id);
+  if (result.changes === 0) return res.status(404).json({ error: 'project not found' });
+  res.status(204).send();
 });
 
 module.exports = router;
