@@ -44,8 +44,7 @@ function parsePostmanCollection(json) {
     const url = typeof req.url === 'string' ? req.url : (req.url && req.url.raw) || '';
 
     const headers = (req.header || [])
-      .filter(h => !h.disabled)
-      .map(h => ({ key: h.key, value: h.value, enabled: true }));
+      .map(h => ({ key: h.key, value: h.value, enabled: !h.disabled }));
 
     let body_type = 'none';
     let body = '';
