@@ -294,7 +294,6 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
     ? `${matches[activeMatch].path}::${matches[activeMatch].type}`
     : null;
 
-  // When query changes: reset activeMatch and auto-expand ancestors of all matches
   useEffect(() => {
     setActiveMatch(0);
     if (!searchQuery) return;
@@ -314,6 +313,32 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
 
   const activeRef = useRef(null);
 
+  // Scroll active match into view whenever it changes
+  useEffect(() => {
+    if (activeRef.current) {
+      activeRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [activeMatch, activeMatchKey]);
+
+  function goNext() {
+    if (matches.length === 0) return;
+    setActiveMatch(i => (i + 1) % matches.length);
+  }
+
+  function goPrev() {
+    if (matches.length === 0) return;
+    setActiveMatch(i => (i - 1 + matches.length) % matches.length);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.shiftKey ? goPrev() : goNext();
+    } else if (e.key === 'Escape') {
+      setSearchQuery('');
+    }
+  }
+
   const ctx = {
     collapsedPaths,
     togglePath,
@@ -326,17 +351,42 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
   return (
     <TreeContext.Provider value={ctx}>
       <div className="flex flex-col overflow-hidden h-full">
-        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-700 shrink-0">
+        {/* Search bar */}
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-gray-700 shrink-0">
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Search keys and values…"
-            className="flex-1 bg-gray-800 text-gray-200 text-xs rounded px-2 py-0.5 outline-none placeholder-gray-600"
+            className="flex-1 bg-gray-800 text-gray-200 text-xs rounded px-2 py-0.5 outline-none placeholder-gray-600 min-w-0"
           />
           {searchQuery && (
-            <span className="text-xs text-gray-500 shrink-0">
-              {matches.length === 0 ? '0 / 0' : `${activeMatch + 1} / ${matches.length}`}
-            </span>
+            <>
+              <span className="text-xs text-gray-500 shrink-0">
+                {matches.length === 0 ? '0 / 0' : `${activeMatch + 1} / ${matches.length}`}
+              </span>
+              <button
+                onClick={goPrev}
+                title="Previous match (Shift+Enter)"
+                className="text-gray-400 hover:text-gray-200 text-xs px-1 shrink-0"
+              >
+                ‹
+              </button>
+              <button
+                onClick={goNext}
+                title="Next match (Enter)"
+                className="text-gray-400 hover:text-gray-200 text-xs px-1 shrink-0"
+              >
+                ›
+              </button>
+              <button
+                onClick={() => setSearchQuery('')}
+                title="Clear (Escape)"
+                className="text-gray-400 hover:text-gray-200 text-xs px-1 shrink-0"
+              >
+                ×
+              </button>
+            </>
           )}
           <button
             onClick={onCopy}
@@ -345,6 +395,7 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
             {copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
+        {/* Tree */}
         <div className="flex-1 overflow-y-auto p-3 font-mono text-xs">
           <JsonNode data={data} path="" depth={0} isLast={true} />
         </div>
