@@ -125,4 +125,29 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.get('/preview/:token', async (req, res) => {
+  const entry = tokenStore.get(req.params.token);
+  if (!entry || entry.expiresAt < Date.now()) {
+    return res.status(404).json({ error: 'Token not found or expired' });
+  }
+
+  try {
+    const { resolvedUrl, fetchOptions } = buildFetchArgs(entry.config, req.headers['range']);
+    const response = await fetch(resolvedUrl, fetchOptions);
+
+    res.status(response.status);
+
+    for (const h of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control']) {
+      const val = response.headers.get(h);
+      if (val) res.setHeader(h, val);
+    }
+
+    const readable = Readable.fromWeb(response.body);
+    req.on('close', () => readable.destroy());
+    readable.pipe(res);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
