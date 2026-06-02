@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { resolveFilename } from '../../utils/filename';
+import { classifyContentType } from '../../utils/contentType';
 
 const STATUS_COLOR = (status) => {
   if (!status) return 'text-gray-500';
@@ -55,6 +56,51 @@ function DownloadButton({ response }) {
   );
 }
 
+function FileIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+function PreviewContent({ contentType, previewToken }) {
+  const src = `/api/proxy/preview/${previewToken}`;
+  const kind = classifyContentType(contentType);
+
+  if (kind === 'image' || kind === 'svg') {
+    return (
+      <img
+        src={src}
+        alt="response preview"
+        className="max-w-full max-h-full object-contain"
+      />
+    );
+  }
+  if (kind === 'video') {
+    return (
+      <video controls src={src} className="max-w-full max-h-full">
+        Your browser does not support video playback.
+      </video>
+    );
+  }
+  if (kind === 'audio') {
+    return <audio controls src={src} className="w-full" />;
+  }
+
+  // Unknown binary — show file icon + extension
+  const ext = contentType
+    ? contentType.split(';')[0].trim().split('/')[1] || null
+    : null;
+
+  return (
+    <div className="flex flex-col items-center gap-2 text-gray-400">
+      <FileIcon />
+      <span className="text-xs">{ext ? `.${ext}` : contentType || 'unknown'}</span>
+    </div>
+  );
+}
+
 export default function ResponsePanel({ response, isSending }) {
   const [tab, setTab] = useState('pretty');
 
@@ -88,6 +134,9 @@ export default function ResponsePanel({ response, isSending }) {
 
   const responseHeaders = response.headers || {};
   const prettyBody = tryPrettyPrint(response.body || '');
+  const isBinary = !!(response && response.previewToken);
+  const tabs = isBinary ? ['preview', 'headers'] : ['pretty', 'raw', 'headers'];
+  const activeTab = tabs.includes(tab) ? tab : tabs[0];
 
   return (
     <div className="w-96 shrink-0 flex flex-col overflow-hidden">
@@ -105,12 +154,12 @@ export default function ResponsePanel({ response, isSending }) {
       </div>
 
       <div className="flex border-b border-gray-700 px-3 shrink-0">
-        {['pretty', 'raw', 'headers'].map((t) => (
+        {tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-3 py-2 text-xs capitalize ${
-              tab === t ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'
+              activeTab === t ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'
             }`}
           >
             {t}
@@ -119,17 +168,25 @@ export default function ResponsePanel({ response, isSending }) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {tab === 'pretty' && (
+        {activeTab === 'pretty' && (
           <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">
             {prettyBody || <span className="text-gray-600">Empty response</span>}
           </pre>
         )}
-        {tab === 'raw' && (
+        {activeTab === 'raw' && (
           <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">
             {response.body || <span className="text-gray-600">Empty response</span>}
           </pre>
         )}
-        {tab === 'headers' && (
+        {activeTab === 'preview' && (
+          <div className="flex-1 flex items-center justify-center p-4 min-h-48">
+            <PreviewContent
+              contentType={responseHeaders['content-type']}
+              previewToken={response.previewToken}
+            />
+          </div>
+        )}
+        {activeTab === 'headers' && (
           <div className="p-3 space-y-1">
             {Object.entries(responseHeaders).map(([key, value]) => (
               <div key={key} className="flex gap-2 text-xs">
