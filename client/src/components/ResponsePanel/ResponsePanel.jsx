@@ -209,7 +209,6 @@ export default function ResponsePanel({ response, isSending }) {
           parsedBody !== undefined ? (
             <JsonTree
               data={parsedBody}
-              prettyBody={prettyBody}
               onCopy={() => handleCopy(prettyBody)}
               copied={copied}
             />
