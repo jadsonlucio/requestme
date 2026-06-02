@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { resolveFilename } from '../../utils/filename';
 
 const STATUS_COLOR = (status) => {
   if (!status) return 'text-gray-500';
@@ -14,6 +15,44 @@ function tryPrettyPrint(body) {
   } catch {
     return body;
   }
+}
+
+function DownloadButton({ response }) {
+  const headers = response.headers || {};
+  const contentType = headers['content-type'] || '';
+  const filename = resolveFilename(headers, response.requestUrl || '', contentType);
+
+  function handleTextDownload() {
+    const blob = new Blob([response.body], { type: contentType || 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const btnClass = 'ml-auto text-xs text-gray-400 hover:text-gray-200 px-2 py-0.5 rounded border border-gray-600 hover:border-gray-400 transition-colors';
+
+  if (response.previewToken) {
+    return (
+      <a
+        href={`/api/proxy/preview/${response.previewToken}`}
+        download={filename}
+        className={btnClass}
+      >
+        Download
+      </a>
+    );
+  }
+
+  return (
+    <button onClick={handleTextDownload} className={btnClass}>
+      Download
+    </button>
+  );
 }
 
 export default function ResponsePanel({ response, isSending }) {
@@ -60,8 +99,9 @@ export default function ResponsePanel({ response, isSending }) {
         <span className="text-gray-600 text-xs">
           {responseHeaders['content-length']
             ? `${responseHeaders['content-length']} B`
-            : `${(response.body || '').length} B`}
+            : response.body != null ? `${response.body.length} B` : ''}
         </span>
+        <DownloadButton response={response} />
       </div>
 
       <div className="flex border-b border-gray-700 px-3 shrink-0">
