@@ -7,7 +7,7 @@ export function classifyContentType(contentType) {
   if (
     ct.startsWith('text/') ||
     ct === 'application/xml' ||
-    ct.includes('+xml') ||
+    (ct.includes('+xml') && !ct.startsWith('image/')) ||
     ct === 'application/javascript' ||
     ct === 'application/x-javascript'
   ) return 'text';

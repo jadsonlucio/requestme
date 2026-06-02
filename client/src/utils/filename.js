@@ -30,8 +30,11 @@ export function resolveFilename(responseHeaders, requestUrl, contentType) {
   if (disposition) {
     const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i);
     if (match) {
-      const name = match[1].trim().split(/[/\\]/).pop();
-      if (name) return name;
+      const raw = match[1].trim().split(/[/\\]/).pop();
+      if (raw) {
+        const name = /filename\*=/i.test(disposition) ? decodeURIComponent(raw) : raw;
+        return name;
+      }
     }
   }
 
@@ -39,7 +42,7 @@ export function resolveFilename(responseHeaders, requestUrl, contentType) {
   try {
     const pathname = new URL(requestUrl).pathname;
     const segment = pathname.split('/').pop();
-    if (segment && segment.includes('.')) return segment;
+    if (segment && /\.\w{1,5}$/.test(segment)) return segment;
   } catch {}
 
   // 3. Fallback: "response.<ext>" or "response"
