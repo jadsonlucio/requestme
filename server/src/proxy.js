@@ -142,8 +142,14 @@ router.get('/preview/:token', async (req, res) => {
       if (val) res.setHeader(h, val);
     }
 
+    if (!response.body) {
+      res.end();
+      return;
+    }
+
     const readable = Readable.fromWeb(response.body);
     req.on('close', () => readable.destroy());
+    readable.on('error', () => res.destroy());
     readable.pipe(res);
   } catch (error) {
     res.status(500).json({ error: error.message });
