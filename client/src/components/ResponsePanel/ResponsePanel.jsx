@@ -127,6 +127,13 @@ function PreviewContent({ contentType, disposition, previewToken }) {
 
 export default function ResponsePanel({ response, isSending }) {
   const [tab, setTab] = useState('pretty');
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy(text) {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   if (isSending) {
     return (
@@ -193,9 +200,19 @@ export default function ResponsePanel({ response, isSending }) {
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'pretty' && (
-          <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">
-            {prettyBody || <span className="text-gray-600">Empty response</span>}
-          </pre>
+          <div className="relative">
+            {prettyBody && (
+              <button
+                onClick={() => handleCopy(prettyBody)}
+                className="absolute top-2 right-2 text-xs text-gray-500 hover:text-gray-300 px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-500 bg-gray-900/80 transition-colors"
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            )}
+            <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">
+              {prettyBody || <span className="text-gray-600">Empty response</span>}
+            </pre>
+          </div>
         )}
         {activeTab === 'raw' && (
           <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">
