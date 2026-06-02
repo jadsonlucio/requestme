@@ -121,7 +121,8 @@ router.post('/', async (req, res) => {
       res.json({ status: response.status, statusText: response.statusText, headers: responseHeaders, time_ms, previewToken: token, bodyType: 'binary' });
     }
   } catch (error) {
-    res.json({ error: error.message, status: 0, statusText: 'Network Error', headers: {}, body: '', time_ms: Date.now() - start });
+    const message = error.cause?.message || error.message;
+    res.json({ error: message, status: 0, statusText: 'Network Error', headers: {}, body: '', time_ms: Date.now() - start });
   }
 });
 
