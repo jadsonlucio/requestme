@@ -132,7 +132,10 @@ router.get('/preview/:token', async (req, res) => {
   }
 
   try {
-    const { resolvedUrl, fetchOptions } = buildFetchArgs(entry.config, req.headers['range']);
+    const { resolvedUrl, fetchOptions } = buildFetchArgs(
+      { ...entry.config, method: 'GET' },
+      req.headers['range']
+    );
     const response = await fetch(resolvedUrl, fetchOptions);
 
     res.status(response.status);

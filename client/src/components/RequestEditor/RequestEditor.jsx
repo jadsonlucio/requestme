@@ -65,19 +65,21 @@ export default function RequestEditor({ onResponse, isSending, setIsSending }) {
       } catch {}
     }
 
-    const result = await sendRequest({
-      method: localRequest.method,
-      url: localRequest.url,
-      headers: localRequest.headers || [],
-      body_type: localRequest.body_type,
-      body: localRequest.body,
-      auth_type: localRequest.auth_type,
-      auth_config: localRequest.auth_config || {},
-      variables,
-    });
-
-    setIsSending(false);
-    onResponse({ ...result, requestUrl: localRequest.url });
+    try {
+      const result = await sendRequest({
+        method: localRequest.method,
+        url: localRequest.url,
+        headers: localRequest.headers || [],
+        body_type: localRequest.body_type,
+        body: localRequest.body,
+        auth_type: localRequest.auth_type,
+        auth_config: localRequest.auth_config || {},
+        variables,
+      });
+      onResponse({ ...result, requestUrl: localRequest.url });
+    } finally {
+      setIsSending(false);
+    }
   }
 
   if (!localRequest) {

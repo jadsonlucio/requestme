@@ -28,13 +28,16 @@ export function resolveFilename(responseHeaders, requestUrl, contentType) {
   // 1. Content-Disposition header
   const disposition = responseHeaders['content-disposition'];
   if (disposition) {
-    const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)["']?/i);
-    if (match) {
-      const raw = match[1].trim().split(/[/\\]/).pop();
-      if (raw) {
-        const name = /filename\*=/i.test(disposition) ? decodeURIComponent(raw) : raw;
-        return name;
-      }
+    // RFC 6266: filename*= (extended, percent-encoded) takes precedence over filename=
+    const extMatch = disposition.match(/filename\*=(?:UTF-8'')?([^;\r\n]+)/i);
+    if (extMatch) {
+      const name = decodeURIComponent(extMatch[1].trim()).split(/[/\\]/).pop();
+      if (name) return name;
+    }
+    const simpleMatch = disposition.match(/filename=["']?([^"';\r\n]+)["']?/i);
+    if (simpleMatch) {
+      const name = simpleMatch[1].trim().split(/[/\\]/).pop();
+      if (name) return name;
     }
   }
 
