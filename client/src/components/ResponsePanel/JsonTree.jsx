@@ -17,8 +17,10 @@ function collectDefaultCollapsed(val, path, depth, result) {
     val.forEach((item, i) =>
       collectDefaultCollapsed(item, path ? `${path}.${i}` : String(i), depth + 1, result));
   } else {
-    Object.entries(val).forEach(([k, v]) =>
-      collectDefaultCollapsed(v, path ? `${path}.${k}` : k, depth + 1, result));
+    Object.entries(val).forEach(([k, v]) => {
+      const ek = k.replace(/\./g, '\x1f');
+      collectDefaultCollapsed(v, path ? `${path}.${ek}` : ek, depth + 1, result);
+    });
   }
 }
 
@@ -41,7 +43,10 @@ export function buildMatches(val, query) {
     } else if (Array.isArray(v)) {
       v.forEach((item, i) => walk(item, path ? `${path}.${i}` : String(i), i));
     } else {
-      Object.entries(v).forEach(([k, child]) => walk(child, path ? `${path}.${k}` : k, k));
+      Object.entries(v).forEach(([k, child]) => {
+        const ek = k.replace(/\./g, '\x1f');
+        walk(child, path ? `${path}.${ek}` : ek, k);
+      });
     }
   }
 
@@ -53,7 +58,10 @@ export function buildMatches(val, query) {
   } else if (Array.isArray(val)) {
     val.forEach((item, i) => walk(item, String(i), i));
   } else {
-    Object.entries(val).forEach(([k, v]) => walk(v, k, k));
+    Object.entries(val).forEach(([k, v]) => {
+      const ek = k.replace(/\./g, '\x1f');
+      walk(v, ek, k);
+    });
   }
 
   return results;
@@ -84,7 +92,7 @@ function highlightText(text, query, isActive, activeRef) {
         ref={isActive && isFirst ? activeRef : null}
         className={isActive ? 'bg-orange-400 text-gray-900 rounded-sm' : 'bg-yellow-300 text-gray-900 rounded-sm'}
       >
-        {text.slice(idx, idx + query.length)}
+        {text.slice(idx, idx + q.length)}
       </mark>
     );
     isFirst = false;
@@ -104,7 +112,8 @@ const TreeContext = createContext(null);
 // Renders a quoted object key with optional search highlight
 function RenderKey({ name, path }) {
   const { searchQuery, matchSet, activeMatchKey, activeRef } = useContext(TreeContext);
-  const text = `"${name}"`;
+  const text = `"${name.replace(//g, '.')}"`;
+
   const mKey = `${path}::key`;
   const isMatch = matchSet.has(mKey);
   const isActive = activeMatchKey === mKey;
@@ -169,7 +178,8 @@ function ObjectNode({ data, path, depth, isLast }) {
       ) : (
         <>
           {entries.map(([k, v], i) => {
-            const childPath = path ? `${path}.${k}` : k;
+            const ek = k.replace(/\./g, ''); // escape dots with unit separator
+            const childPath = path ? `${path}.${ek}` : ek;
             const isNested = v !== null && typeof v === 'object';
             const isChildCollapsed = isNested && collapsedPaths.has(childPath);
             const isLastEntry = i === entries.length - 1;
@@ -262,7 +272,7 @@ function ArrayNode({ data, path, depth, isLast }) {
 
 // ─── main export (stubbed state — collapse and search added in Tasks 3–5) ─────
 
-export default function JsonTree({ data, prettyBody, onCopy, copied }) {
+export default function JsonTree({ data, onCopy, copied }) {
   const isLarge = useMemo(() => countNodes(data) > 500, [data]);
 
   const [collapsedPaths, setCollapsedPaths] = useState(() => {
@@ -293,6 +303,17 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
   const activeMatchKey = matches[activeMatch]
     ? `${matches[activeMatch].path}::${matches[activeMatch].type}`
     : null;
+
+  // Reset collapse and search state when a new response loads
+  useEffect(() => {
+    setSearchQuery('');
+    setActiveMatch(0);
+    const result = new Set();
+    if (countNodes(data) > 500) {
+      collectDefaultCollapsed(data, '', 0, result);
+    }
+    setCollapsedPaths(result);
+  }, [data]);
 
   useEffect(() => {
     setActiveMatch(0);
