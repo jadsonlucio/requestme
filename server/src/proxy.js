@@ -95,7 +95,7 @@ setInterval(() => {
   for (const [token, entry] of tokenStore) {
     if (entry.expiresAt < now) tokenStore.delete(token);
   }
-}, 60_000);
+}, 60_000).unref();
 
 router.post('/', async (req, res) => {
   const config = req.body;
