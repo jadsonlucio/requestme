@@ -184,7 +184,7 @@ function ObjectNode({ data, path, depth, isLast }) {
             const isChildCollapsed = isNested && collapsedPaths.has(childPath);
             const isLastEntry = i === entries.length - 1;
             return (
-              <div key={k} style={{ paddingLeft: `${(depth + 1) * 16}px` }} className="group relative">
+              <div key={k} style={{ paddingLeft: '16px' }} className="group relative">
                 {/* Toggle arrow before key — only for objects/arrays */}
                 <span
                   onClick={isNested ? () => togglePath(childPath) : undefined}
@@ -218,7 +218,7 @@ function ObjectNode({ data, path, depth, isLast }) {
               </div>
             );
           })}
-          <div style={{ paddingLeft: `${depth * 16}px` }}>
+          <div>
             <span className="text-gray-400">{'}'}</span>
             {!isLast && <span className="text-gray-500">,</span>}
           </div>
@@ -247,7 +247,7 @@ function ArrayNode({ data, path, depth, isLast }) {
             const isChildCollapsed = isNested && collapsedPaths.has(childPath);
             const isLastItem = i === data.length - 1;
             return (
-              <div key={i} style={{ paddingLeft: `${(depth + 1) * 16}px` }} className="group relative">
+              <div key={i} style={{ paddingLeft: '16px' }} className="group relative">
                 <span
                   onClick={isNested ? () => togglePath(childPath) : undefined}
                   className={isNested
@@ -278,7 +278,7 @@ function ArrayNode({ data, path, depth, isLast }) {
               </div>
             );
           })}
-          <div style={{ paddingLeft: `${depth * 16}px` }}>
+          <div>
             <span className="text-gray-400">{']'}</span>
             {!isLast && <span className="text-gray-500">,</span>}
           </div>
