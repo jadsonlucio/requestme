@@ -164,7 +164,7 @@ function JsonNode({ data, path, depth, isLast }) {
 }
 
 function ObjectNode({ data, path, depth, isLast }) {
-  const { collapsedPaths, togglePath } = useContext(TreeContext);
+  const { collapsedPaths, togglePath, recentlyCopied, copyNode } = useContext(TreeContext);
   const entries = Object.entries(data);
 
   return (
@@ -184,7 +184,7 @@ function ObjectNode({ data, path, depth, isLast }) {
             const isChildCollapsed = isNested && collapsedPaths.has(childPath);
             const isLastEntry = i === entries.length - 1;
             return (
-              <div key={k} style={{ paddingLeft: `${(depth + 1) * 16}px` }}>
+              <div key={k} style={{ paddingLeft: `${(depth + 1) * 16}px` }} className="group relative">
                 {/* Toggle arrow before key — only for objects/arrays */}
                 <span
                   onClick={isNested ? () => togglePath(childPath) : undefined}
@@ -206,6 +206,15 @@ function ObjectNode({ data, path, depth, isLast }) {
                 ) : (
                   <JsonNode data={v} path={childPath} depth={depth + 1} isLast={isLastEntry} />
                 )}
+                {isNested && (
+                  <button
+                    onClick={e => { e.stopPropagation(); copyNode(childPath, v); }}
+                    className="absolute right-2 top-0 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 text-xs select-none transition-opacity"
+                    title="Copy value"
+                  >
+                    {recentlyCopied === childPath ? '✓' : '⎘'}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -220,7 +229,7 @@ function ObjectNode({ data, path, depth, isLast }) {
 }
 
 function ArrayNode({ data, path, depth, isLast }) {
-  const { collapsedPaths, togglePath } = useContext(TreeContext);
+  const { collapsedPaths, togglePath, recentlyCopied, copyNode } = useContext(TreeContext);
 
   return (
     <>
@@ -238,7 +247,7 @@ function ArrayNode({ data, path, depth, isLast }) {
             const isChildCollapsed = isNested && collapsedPaths.has(childPath);
             const isLastItem = i === data.length - 1;
             return (
-              <div key={i} style={{ paddingLeft: `${(depth + 1) * 16}px` }}>
+              <div key={i} style={{ paddingLeft: `${(depth + 1) * 16}px` }} className="group relative">
                 <span
                   onClick={isNested ? () => togglePath(childPath) : undefined}
                   className={isNested
@@ -256,6 +265,15 @@ function ArrayNode({ data, path, depth, isLast }) {
                   </>
                 ) : (
                   <JsonNode data={item} path={childPath} depth={depth + 1} isLast={isLastItem} />
+                )}
+                {isNested && (
+                  <button
+                    onClick={e => { e.stopPropagation(); copyNode(childPath, item); }}
+                    className="absolute right-2 top-0 opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 text-xs select-none transition-opacity"
+                    title="Copy value"
+                  >
+                    {recentlyCopied === childPath ? '✓' : '⎘'}
+                  </button>
                 )}
               </div>
             );
@@ -332,6 +350,14 @@ export default function JsonTree({ data, onCopy, copied }) {
     });
   }, [searchQuery, matches]);
 
+  const [recentlyCopied, setRecentlyCopied] = useState(null);
+
+  function copyNode(path, value) {
+    navigator.clipboard.writeText(JSON.stringify(value, null, 2));
+    setRecentlyCopied(path);
+    setTimeout(() => setRecentlyCopied(null), 1500);
+  }
+
   const activeRef = useRef(null);
 
   // Scroll active match into view whenever it changes
@@ -367,6 +393,8 @@ export default function JsonTree({ data, onCopy, copied }) {
     matchSet,
     activeMatchKey,
     activeRef,
+    recentlyCopied,
+    copyNode,
   };
 
   return (
