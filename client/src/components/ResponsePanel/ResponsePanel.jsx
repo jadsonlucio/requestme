@@ -64,9 +64,32 @@ function FileIcon() {
   );
 }
 
-function PreviewContent({ contentType, previewToken }) {
+const EXT_TO_KIND = {
+  mp4: 'video', webm: 'video', ogv: 'video', ogg: 'video', mov: 'video', avi: 'video', mkv: 'video',
+  mp3: 'audio', wav: 'audio', flac: 'audio', m4a: 'audio', aac: 'audio', opus: 'audio',
+  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image', ico: 'image',
+  svg: 'svg',
+};
+
+function classifyByExtension(filename) {
+  if (!filename) return null;
+  const ext = filename.split('.').pop()?.toLowerCase();
+  return EXT_TO_KIND[ext] || null;
+}
+
+function extractFilename(disposition) {
+  if (!disposition) return null;
+  const m = disposition.match(/filename=["']?([^"';\r\n]+)["']?/i);
+  return m ? m[1].trim() : null;
+}
+
+function PreviewContent({ contentType, disposition, previewToken }) {
   const src = `/api/proxy/preview/${previewToken}`;
-  const kind = classifyContentType(contentType);
+  let kind = classifyContentType(contentType);
+
+  if (kind === 'binary') {
+    kind = classifyByExtension(extractFilename(disposition)) || 'binary';
+  }
 
   if (kind === 'image' || kind === 'svg') {
     return (
@@ -88,10 +111,11 @@ function PreviewContent({ contentType, previewToken }) {
     return <audio controls src={src} className="w-full" />;
   }
 
-  // Unknown binary — show file icon + extension
-  const ext = contentType
-    ? contentType.split(';')[0].trim().split('/')[1] || null
-    : null;
+  // Unknown binary — show file icon + extension from filename or content-type
+  const filename = extractFilename(disposition);
+  const ext = filename?.includes('.')
+    ? filename.split('.').pop()
+    : contentType?.split(';')[0].trim().split('/')[1] || null;
 
   return (
     <div className="flex flex-col items-center gap-2 text-gray-400">
@@ -182,6 +206,7 @@ export default function ResponsePanel({ response, isSending }) {
           <div className="flex-1 flex items-center justify-center p-4 min-h-48">
             <PreviewContent
               contentType={responseHeaders['content-type']}
+              disposition={responseHeaders['content-disposition']}
               previewToken={response.previewToken}
             />
           </div>
