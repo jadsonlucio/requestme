@@ -280,14 +280,46 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
     });
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeMatch, setActiveMatch] = useState(0);
+
+  const matches = useMemo(() => buildMatches(data, searchQuery), [data, searchQuery]);
+
+  const matchSet = useMemo(
+    () => new Set(matches.map(m => `${m.path}::${m.type}`)),
+    [matches]
+  );
+
+  const activeMatchKey = matches[activeMatch]
+    ? `${matches[activeMatch].path}::${matches[activeMatch].type}`
+    : null;
+
+  // When query changes: reset activeMatch and auto-expand ancestors of all matches
+  useEffect(() => {
+    setActiveMatch(0);
+    if (!searchQuery) return;
+    const toExpand = new Set();
+    for (const m of matches) {
+      for (const ancestor of getAncestorPaths(m.path)) {
+        toExpand.add(ancestor);
+      }
+    }
+    if (toExpand.size === 0) return;
+    setCollapsedPaths(prev => {
+      const next = new Set(prev);
+      for (const p of toExpand) next.delete(p);
+      return next;
+    });
+  }, [searchQuery, matches]);
+
   const activeRef = useRef(null);
 
   const ctx = {
     collapsedPaths,
     togglePath,
-    searchQuery: '',
-    matchSet: new Set(),
-    activeMatchKey: null,
+    searchQuery,
+    matchSet,
+    activeMatchKey,
     activeRef,
   };
 
@@ -296,10 +328,16 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
       <div className="flex flex-col overflow-hidden h-full">
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-700 shrink-0">
           <input
-            disabled
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search keys and values…"
-            className="flex-1 bg-gray-800 text-gray-600 text-xs rounded px-2 py-0.5 outline-none placeholder-gray-600"
+            className="flex-1 bg-gray-800 text-gray-200 text-xs rounded px-2 py-0.5 outline-none placeholder-gray-600"
           />
+          {searchQuery && (
+            <span className="text-xs text-gray-500 shrink-0">
+              {matches.length === 0 ? '0 / 0' : `${activeMatch + 1} / ${matches.length}`}
+            </span>
+          )}
           <button
             onClick={onCopy}
             className="text-xs text-gray-400 hover:text-gray-200 px-1.5 py-0.5 rounded border border-gray-600 hover:border-gray-400 transition-colors shrink-0"
