@@ -263,11 +263,28 @@ function ArrayNode({ data, path, depth, isLast }) {
 // ─── main export (stubbed state — collapse and search added in Tasks 3–5) ─────
 
 export default function JsonTree({ data, prettyBody, onCopy, copied }) {
+  const isLarge = useMemo(() => countNodes(data) > 500, [data]);
+
+  const [collapsedPaths, setCollapsedPaths] = useState(() => {
+    if (!isLarge) return new Set();
+    const result = new Set();
+    collectDefaultCollapsed(data, '', 0, result);
+    return result;
+  });
+
+  const togglePath = (path) => {
+    setCollapsedPaths(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) { next.delete(path); } else { next.add(path); }
+      return next;
+    });
+  };
+
   const activeRef = useRef(null);
 
   const ctx = {
-    collapsedPaths: new Set(),
-    togglePath: () => {},
+    collapsedPaths,
+    togglePath,
     searchQuery: '',
     matchSet: new Set(),
     activeMatchKey: null,
@@ -277,7 +294,6 @@ export default function JsonTree({ data, prettyBody, onCopy, copied }) {
   return (
     <TreeContext.Provider value={ctx}>
       <div className="flex flex-col overflow-hidden h-full">
-        {/* Search bar placeholder — added in Task 5 */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-700 shrink-0">
           <input
             disabled
