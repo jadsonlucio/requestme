@@ -19,6 +19,74 @@ function applyAuth(headers, authType, authConfig) {
   }
 }
 
+
+function isTextLike(contentType) {
+  if (!contentType) return false;
+  const ct = contentType.split(';')[0].trim().toLowerCase();
+  if (ct === 'image/svg+xml') return false;
+  return (
+    ct.startsWith('text/') ||
+    ct === 'application/json' ||
+    ct.includes('+json') ||
+    ct === 'application/xml' ||
+    ct.includes('+xml') ||
+    ct === 'application/javascript' ||
+    ct === 'application/x-www-form-urlencoded'
+  );
+}
+
+function buildFetchArgs(config, rangeHeader) {
+  const {
+    method = 'GET',
+    url = '',
+    headers: rawHeaders = [],
+    body_type = 'none',
+    body = '',
+    auth_type = 'none',
+    auth_config = {},
+    variables = {},
+  } = config;
+
+  let resolvedUrl = substituteVariables(url, variables);
+
+  if (auth_type === 'apikey' && auth_config.in === 'query' && auth_config.key) {
+    const sep = resolvedUrl.includes('?') ? '&' : '?';
+    resolvedUrl += `${sep}${encodeURIComponent(auth_config.key)}=${encodeURIComponent(auth_config.value || '')}`;
+  }
+
+  const resolvedHeaders = {};
+  for (const h of rawHeaders) {
+    if (h.enabled !== false && h.key) {
+      resolvedHeaders[substituteVariables(h.key, variables)] = substituteVariables(h.value || '', variables);
+    }
+  }
+  applyAuth(resolvedHeaders, auth_type, auth_config);
+
+  if (rangeHeader) resolvedHeaders['Range'] = rangeHeader;
+
+  const fetchOptions = { method: method.toUpperCase(), headers: resolvedHeaders };
+
+  if (!['GET', 'HEAD'].includes(fetchOptions.method) && body_type !== 'none') {
+    if (body_type === 'json') {
+      resolvedHeaders['Content-Type'] = resolvedHeaders['Content-Type'] || 'application/json';
+      fetchOptions.body = body;
+    } else if (body_type === 'form') {
+      const params = new URLSearchParams();
+      let formRows = [];
+      try { formRows = JSON.parse(body); } catch {}
+      for (const row of formRows) {
+        if (row.enabled !== false && row.key) params.append(row.key, row.value || '');
+      }
+      resolvedHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+      fetchOptions.body = params.toString();
+    } else if (body_type === 'raw') {
+      fetchOptions.body = body;
+    }
+  }
+
+  return { resolvedUrl, fetchOptions };
+}
+
 router.post('/', async (req, res) => {
   const {
     method = 'GET',
