@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { resolveFilename } from '../../utils/filename';
 import { classifyContentType } from '../../utils/contentType';
+import JsonTree from './JsonTree';
 
 const STATUS_COLOR = (status) => {
   if (!status) return 'text-gray-500';
@@ -129,6 +130,11 @@ export default function ResponsePanel({ response, isSending }) {
   const [tab, setTab] = useState('pretty');
   const [copied, setCopied] = useState(false);
 
+  const parsedBody = useMemo(() => {
+    if (!response?.body) return undefined;
+    try { return JSON.parse(response.body); } catch { return undefined; }
+  }, [response?.body]);
+
   function handleCopy(text) {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -200,19 +206,28 @@ export default function ResponsePanel({ response, isSending }) {
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'pretty' && (
-          <div className="relative">
-            {prettyBody && (
-              <button
-                onClick={() => handleCopy(prettyBody)}
-                className="absolute top-2 right-2 text-xs text-gray-500 hover:text-gray-300 px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-500 bg-gray-900/80 transition-colors"
-              >
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            )}
-            <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">
-              {prettyBody || <span className="text-gray-600">Empty response</span>}
-            </pre>
-          </div>
+          parsedBody !== undefined ? (
+            <JsonTree
+              data={parsedBody}
+              prettyBody={prettyBody}
+              onCopy={() => handleCopy(prettyBody)}
+              copied={copied}
+            />
+          ) : (
+            <div className="relative">
+              {prettyBody && (
+                <button
+                  onClick={() => handleCopy(prettyBody)}
+                  className="absolute top-2 right-2 text-xs text-gray-500 hover:text-gray-300 px-1.5 py-0.5 rounded border border-gray-700 hover:border-gray-500 bg-gray-900/80 transition-colors"
+                >
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              )}
+              <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">
+                {prettyBody || <span className="text-gray-600">Empty response</span>}
+              </pre>
+            </div>
+          )
         )}
         {activeTab === 'raw' && (
           <pre className="p-3 text-xs text-gray-200 whitespace-pre-wrap break-all font-mono">

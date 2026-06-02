@@ -94,3 +94,207 @@ function highlightText(text, query, isActive, activeRef) {
   if (start < text.length) parts.push(text.slice(start));
   return parts;
 }
+
+// ─── context ──────────────────────────────────────────────────────────────────
+
+const TreeContext = createContext(null);
+
+// ─── render helpers ───────────────────────────────────────────────────────────
+
+// Renders a quoted object key with optional search highlight
+function RenderKey({ name, path }) {
+  const { searchQuery, matchSet, activeMatchKey, activeRef } = useContext(TreeContext);
+  const text = `"${name}"`;
+  const mKey = `${path}::key`;
+  const isMatch = matchSet.has(mKey);
+  const isActive = activeMatchKey === mKey;
+  if (!isMatch || !searchQuery) return <span className="text-blue-300">{text}</span>;
+  return (
+    <span className="text-blue-300">
+      {highlightText(text, searchQuery, isActive, isActive ? activeRef : null)}
+    </span>
+  );
+}
+
+// Renders a primitive value (string/number/boolean/null) with syntax color + highlight
+function PrimitiveValue({ value, path }) {
+  const { searchQuery, matchSet, activeMatchKey, activeRef } = useContext(TreeContext);
+  const display = value === null ? 'null'
+    : typeof value === 'string' ? `"${value}"`
+    : String(value);
+  const colorClass = value === null ? 'text-gray-500'
+    : typeof value === 'boolean' ? 'text-purple-400'
+    : typeof value === 'number' ? 'text-yellow-300'
+    : 'text-green-400';
+  const mKey = `${path}::value`;
+  const isMatch = matchSet.has(mKey);
+  const isActive = activeMatchKey === mKey;
+  if (!isMatch || !searchQuery) return <span className={colorClass}>{display}</span>;
+  return (
+    <span className={colorClass}>
+      {highlightText(display, searchQuery, isActive, isActive ? activeRef : null)}
+    </span>
+  );
+}
+
+// ─── tree nodes ───────────────────────────────────────────────────────────────
+
+function JsonNode({ data, path, depth, isLast }) {
+  if (data === null || typeof data !== 'object') {
+    return (
+      <>
+        <PrimitiveValue value={data} path={path} />
+        {!isLast && <span className="text-gray-500">,</span>}
+      </>
+    );
+  }
+  if (Array.isArray(data)) {
+    return <ArrayNode data={data} path={path} depth={depth} isLast={isLast} />;
+  }
+  return <ObjectNode data={data} path={path} depth={depth} isLast={isLast} />;
+}
+
+function ObjectNode({ data, path, depth, isLast }) {
+  const { collapsedPaths, togglePath } = useContext(TreeContext);
+  const entries = Object.entries(data);
+
+  return (
+    <>
+      <span className="text-gray-400">{'{'}</span>
+      {entries.length === 0 ? (
+        <>
+          <span className="text-gray-400">{'}'}</span>
+          {!isLast && <span className="text-gray-500">,</span>}
+        </>
+      ) : (
+        <>
+          {entries.map(([k, v], i) => {
+            const childPath = path ? `${path}.${k}` : k;
+            const isNested = v !== null && typeof v === 'object';
+            const isChildCollapsed = isNested && collapsedPaths.has(childPath);
+            const isLastEntry = i === entries.length - 1;
+            return (
+              <div key={k} style={{ paddingLeft: `${(depth + 1) * 16}px` }}>
+                {/* Toggle arrow before key — only for objects/arrays */}
+                <span
+                  onClick={isNested ? () => togglePath(childPath) : undefined}
+                  className={isNested
+                    ? 'text-gray-500 hover:text-gray-300 cursor-pointer select-none mr-1'
+                    : 'inline-block w-3 mr-1'}
+                >
+                  {isNested ? (isChildCollapsed ? '▶' : '▼') : ''}
+                </span>
+                <RenderKey name={k} path={childPath} />
+                <span className="text-gray-500">: </span>
+                {isChildCollapsed ? (
+                  <>
+                    <span className="text-gray-500 italic">
+                      {Array.isArray(v) ? `[… ${v.length} items]` : '{…}'}
+                    </span>
+                    {!isLastEntry && <span className="text-gray-500">,</span>}
+                  </>
+                ) : (
+                  <JsonNode data={v} path={childPath} depth={depth + 1} isLast={isLastEntry} />
+                )}
+              </div>
+            );
+          })}
+          <div style={{ paddingLeft: `${depth * 16}px` }}>
+            <span className="text-gray-400">{'}'}</span>
+            {!isLast && <span className="text-gray-500">,</span>}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function ArrayNode({ data, path, depth, isLast }) {
+  const { collapsedPaths, togglePath } = useContext(TreeContext);
+
+  return (
+    <>
+      <span className="text-gray-400">{'['}</span>
+      {data.length === 0 ? (
+        <>
+          <span className="text-gray-400">{']'}</span>
+          {!isLast && <span className="text-gray-500">,</span>}
+        </>
+      ) : (
+        <>
+          {data.map((item, i) => {
+            const childPath = path ? `${path}.${i}` : String(i);
+            const isNested = item !== null && typeof item === 'object';
+            const isChildCollapsed = isNested && collapsedPaths.has(childPath);
+            const isLastItem = i === data.length - 1;
+            return (
+              <div key={i} style={{ paddingLeft: `${(depth + 1) * 16}px` }}>
+                <span
+                  onClick={isNested ? () => togglePath(childPath) : undefined}
+                  className={isNested
+                    ? 'text-gray-500 hover:text-gray-300 cursor-pointer select-none mr-1'
+                    : 'inline-block w-3 mr-1'}
+                >
+                  {isNested ? (isChildCollapsed ? '▶' : '▼') : ''}
+                </span>
+                {isChildCollapsed ? (
+                  <>
+                    <span className="text-gray-500 italic">
+                      {Array.isArray(item) ? `[… ${item.length} items]` : '{…}'}
+                    </span>
+                    {!isLastItem && <span className="text-gray-500">,</span>}
+                  </>
+                ) : (
+                  <JsonNode data={item} path={childPath} depth={depth + 1} isLast={isLastItem} />
+                )}
+              </div>
+            );
+          })}
+          <div style={{ paddingLeft: `${depth * 16}px` }}>
+            <span className="text-gray-400">{']'}</span>
+            {!isLast && <span className="text-gray-500">,</span>}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+// ─── main export (stubbed state — collapse and search added in Tasks 3–5) ─────
+
+export default function JsonTree({ data, prettyBody, onCopy, copied }) {
+  const activeRef = useRef(null);
+
+  const ctx = {
+    collapsedPaths: new Set(),
+    togglePath: () => {},
+    searchQuery: '',
+    matchSet: new Set(),
+    activeMatchKey: null,
+    activeRef,
+  };
+
+  return (
+    <TreeContext.Provider value={ctx}>
+      <div className="flex flex-col overflow-hidden h-full">
+        {/* Search bar placeholder — added in Task 5 */}
+        <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-700 shrink-0">
+          <input
+            disabled
+            placeholder="Search keys and values…"
+            className="flex-1 bg-gray-800 text-gray-600 text-xs rounded px-2 py-0.5 outline-none placeholder-gray-600"
+          />
+          <button
+            onClick={onCopy}
+            className="text-xs text-gray-400 hover:text-gray-200 px-1.5 py-0.5 rounded border border-gray-600 hover:border-gray-400 transition-colors shrink-0"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 font-mono text-xs">
+          <JsonNode data={data} path="" depth={0} isLast={true} />
+        </div>
+      </div>
+    </TreeContext.Provider>
+  );
+}
