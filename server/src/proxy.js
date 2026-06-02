@@ -31,6 +31,7 @@ function isTextLike(contentType) {
     ct === 'application/xml' ||
     ct.includes('+xml') ||
     ct === 'application/javascript' ||
+    ct === 'application/x-javascript' ||
     ct === 'application/x-www-form-urlencoded'
   );
 }
@@ -62,7 +63,7 @@ function buildFetchArgs(config, rangeHeader) {
   }
   applyAuth(resolvedHeaders, auth_type, auth_config);
 
-  if (rangeHeader) resolvedHeaders['Range'] = rangeHeader;
+  if (rangeHeader) resolvedHeaders['range'] = rangeHeader;
 
   const fetchOptions = { method: method.toUpperCase(), headers: resolvedHeaders };
 
