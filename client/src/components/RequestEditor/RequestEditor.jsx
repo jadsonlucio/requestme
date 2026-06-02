@@ -77,7 +77,7 @@ export default function RequestEditor({ onResponse, isSending, setIsSending }) {
     });
 
     setIsSending(false);
-    onResponse(result);
+    onResponse({ ...result, requestUrl: localRequest.url });
   }
 
   if (!localRequest) {
