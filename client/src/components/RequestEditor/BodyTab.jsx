@@ -1,7 +1,14 @@
 const BODY_TYPES = ['none', 'json', 'form', 'raw'];
 
 function parseFormBody(body) {
-  try { return JSON.parse(body); } catch { return []; }
+  try {
+    const parsed = JSON.parse(body);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed).map(([key, value]) => ({ key, value: String(value), enabled: true }));
+    }
+    return [];
+  } catch { return []; }
 }
 
 export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) {
