@@ -1,7 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const db = require('../db/database');
-const { parsePostmanCollection } = require('../parsers/postmanParser');
+const { parseImportFile } = require('../parsers/importFile');
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -15,16 +15,9 @@ router.post('/projects/import', upload.single('file'), (req, res) => {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  let json;
-  try {
-    json = JSON.parse(req.file.buffer.toString('utf8'));
-  } catch {
-    return res.status(400).json({ error: 'Invalid JSON' });
-  }
-
   let parsed;
   try {
-    parsed = parsePostmanCollection(json);
+    parsed = parseImportFile(req.file.buffer);
   } catch (e) {
     return res.status(e.status || 400).json({ error: e.message });
   }
