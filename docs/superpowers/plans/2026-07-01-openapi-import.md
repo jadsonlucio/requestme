@@ -232,7 +232,7 @@ git commit -m "refactor: extract Postman collection parser into its own module"
 - Test: `server/src/parsers/specUtils.test.js`
 
 **Interfaces:**
-- Produces: `resolveRef(root, ref) -> any`, `stubFromSchema(schema, root, seen?) -> any`, and `mergeParameters(pathLevelParams, operationParams) -> array` — all consumed by `openApiParser.js` (Task 3) and `swaggerV2Parser.js` (Task 4). `mergeParameters` lives here rather than in each parser because OpenAPI 3.x and Swagger 2.0 both merge path-item-level and operation-level parameter arrays the same way (dedupe by `in`+`name`, operation-level wins).
+- Produces: `resolveRef(root, ref) -> any`, `stubFromSchema(schema, root, seen?) -> any`, `mergeParameters(pathLevelParams, operationParams) -> array`, `buildName(tags, summary, operationId, method, path) -> string`, and `resolveEffectiveSecurity(operation, document) -> string|null` — all consumed by `openApiParser.js` (Task 3) and `swaggerV2Parser.js` (Task 4). All five live here because OpenAPI 3.x and Swagger 2.0 share the identical `paths → path → method → operation` shape and the identical `security: [{ schemeName: [] }]` requirement-object format, so parameter merging, name-building, and security-requirement resolution are the same logic for both formats — only how a resolved scheme *name* maps to `auth_type`/`auth_config` differs per format (that stays in each parser).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -241,7 +241,7 @@ Create `server/src/parsers/specUtils.test.js`:
 ```js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resolveRef, stubFromSchema, mergeParameters } = require('./specUtils');
+const { resolveRef, stubFromSchema, mergeParameters, buildName, resolveEffectiveSecurity } = require('./specUtils');
 
 test('resolveRef walks a JSON pointer against the root document (OpenAPI style)', () => {
   const root = { components: { schemas: { User: { type: 'object' } } } };
@@ -321,6 +321,28 @@ test('mergeParameters keeps path-level parameters and lets operation-level param
   const verbose = merged.find((p) => p.in === 'query' && p.name === 'verbose');
   assert.equal(verbose.schema.default, true);
 });
+
+test('buildName prefixes with the first tag when tags are present', () => {
+  assert.equal(buildName(['Pets'], 'Get a pet', undefined, 'get', '/pets/{petId}'), 'Pets / Get a pet');
+});
+
+test('buildName omits the prefix and falls back through summary, operationId, then METHOD path', () => {
+  assert.equal(buildName([], 'Get a pet', undefined, 'get', '/pets/{petId}'), 'Get a pet');
+  assert.equal(buildName(undefined, undefined, 'getPet', 'get', '/pets/{petId}'), 'getPet');
+  assert.equal(buildName(undefined, undefined, undefined, 'get', '/pets/{petId}'), 'GET /pets/{petId}');
+});
+
+test('resolveEffectiveSecurity prefers operation-level security over document-level', () => {
+  const operation = { security: [{ apiKeyAuth: [] }] };
+  const document = { security: [{ bearerAuth: [] }] };
+  assert.equal(resolveEffectiveSecurity(operation, document), 'apiKeyAuth');
+});
+
+test('resolveEffectiveSecurity falls back to document-level security, then null', () => {
+  assert.equal(resolveEffectiveSecurity({}, { security: [{ bearerAuth: [] }] }), 'bearerAuth');
+  assert.equal(resolveEffectiveSecurity({ security: [] }, { security: [{ bearerAuth: [] }] }), null);
+  assert.equal(resolveEffectiveSecurity({}, {}), null);
+});
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -396,13 +418,26 @@ function mergeParameters(pathLevelParams, operationParams) {
   return Array.from(merged.values());
 }
 
-module.exports = { resolveRef, stubFromSchema, mergeParameters };
+function buildName(tags, summary, operationId, method, path) {
+  const label = summary || operationId || `${method.toUpperCase()} ${path}`;
+  if (tags && tags.length > 0) return `${tags[0]} / ${label}`;
+  return label;
+}
+
+function resolveEffectiveSecurity(operation, document) {
+  const security = operation.security ?? document.security ?? [];
+  if (security.length === 0) return null;
+  const names = Object.keys(security[0]);
+  return names[0] || null;
+}
+
+module.exports = { resolveRef, stubFromSchema, mergeParameters, buildName, resolveEffectiveSecurity };
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd server && node --test src/parsers/specUtils.test.js`
-Expected: PASS (10 tests)
+Expected: PASS (14 tests)
 
 - [ ] **Step 5: Commit**
 
@@ -420,7 +455,7 @@ git commit -m "feat: add shared spec-parsing helpers (\$ref resolver, schema stu
 - Test: `server/src/parsers/openApiParser.test.js`
 
 **Interfaces:**
-- Consumes: `stubFromSchema(schema, root)` and `mergeParameters(pathLevelParams, operationParams)` from `./specUtils` (Task 2).
+- Consumes: `stubFromSchema(schema, root)`, `mergeParameters(pathLevelParams, operationParams)`, `buildName(tags, summary, operationId, method, path)`, and `resolveEffectiveSecurity(operation, document)` from `./specUtils` (Task 2).
 - Produces: `parseOpenApiSpec(document) -> { projectName, requests, variables }`, consumed by `importFile.js` (Task 5).
 
 - [ ] **Step 1: Write the failing tests**
@@ -525,7 +560,7 @@ Expected: FAIL with `Cannot find module './openApiParser'`
 Create `server/src/parsers/openApiParser.js`:
 
 ```js
-const { stubFromSchema, mergeParameters } = require('./specUtils');
+const { stubFromSchema, mergeParameters, buildName, resolveEffectiveSecurity } = require('./specUtils');
 
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch'];
 
@@ -586,19 +621,6 @@ function mapSecurityScheme(schemeName, securitySchemes) {
   return { auth_type: 'none', auth_config: {} };
 }
 
-function resolveEffectiveSecurity(operation, document) {
-  const security = operation.security ?? document.security ?? [];
-  if (security.length === 0) return null;
-  const names = Object.keys(security[0]);
-  return names[0] || null;
-}
-
-function buildName(tags, summary, operationId, method, path) {
-  const label = summary || operationId || `${method.toUpperCase()} ${path}`;
-  if (tags && tags.length > 0) return `${tags[0]} / ${label}`;
-  return label;
-}
-
 function parseOpenApiSpec(document) {
   if (!document.openapi || !document.openapi.startsWith('3.')) {
     const err = new Error('Not an OpenAPI 3.x document');
@@ -649,7 +671,6 @@ module.exports = {
   mapParameters,
   mapRequestBody,
   mapSecurityScheme,
-  buildName,
 };
 ```
 
@@ -674,7 +695,7 @@ git commit -m "feat: add OpenAPI 3.x spec parser"
 - Test: `server/src/parsers/swaggerV2Parser.test.js`
 
 **Interfaces:**
-- Consumes: `stubFromSchema(schema, root)` and `mergeParameters(pathLevelParams, operationParams)` from `./specUtils` (Task 2).
+- Consumes: `stubFromSchema(schema, root)`, `mergeParameters(pathLevelParams, operationParams)`, `buildName(tags, summary, operationId, method, path)`, and `resolveEffectiveSecurity(operation, document)` from `./specUtils` (Task 2).
 - Produces: `parseSwaggerV2Spec(document) -> { projectName, requests, variables }`, consumed by `importFile.js` (Task 5).
 
 - [ ] **Step 1: Write the failing tests**
@@ -778,7 +799,7 @@ Expected: FAIL with `Cannot find module './swaggerV2Parser'`
 Create `server/src/parsers/swaggerV2Parser.js`:
 
 ```js
-const { stubFromSchema, mergeParameters } = require('./specUtils');
+const { stubFromSchema, mergeParameters, buildName, resolveEffectiveSecurity } = require('./specUtils');
 
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch'];
 
@@ -832,19 +853,6 @@ function mapSecurityDefinition(schemeName, securityDefinitions) {
   return { auth_type: 'none', auth_config: {} };
 }
 
-function resolveEffectiveSecurity(operation, document) {
-  const security = operation.security ?? document.security ?? [];
-  if (security.length === 0) return null;
-  const names = Object.keys(security[0]);
-  return names[0] || null;
-}
-
-function buildName(tags, summary, operationId, method, path) {
-  const label = summary || operationId || `${method.toUpperCase()} ${path}`;
-  if (tags && tags.length > 0) return `${tags[0]} / ${label}`;
-  return label;
-}
-
 function parseSwaggerV2Spec(document) {
   if (document.swagger !== '2.0') {
     const err = new Error('Not a Swagger 2.0 document');
@@ -896,7 +904,6 @@ module.exports = {
   mapNonBodyParameters,
   mapBody,
   mapSecurityDefinition,
-  buildName,
 };
 ```
 
