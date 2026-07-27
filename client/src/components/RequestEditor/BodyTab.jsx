@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 const BODY_TYPES = ['none', 'json', 'form', 'raw'];
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -28,6 +28,12 @@ function readFileAsBase64(file) {
 
 export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) {
   const [fileErrors, setFileErrors] = useState({});
+  // Kept in sync with the latest `body` prop so async callbacks (e.g. the file
+  // read in handleFilePick) can read fresh rows instead of a stale closure.
+  const bodyRef = useRef(body);
+  useEffect(() => {
+    bodyRef.current = body;
+  }, [body]);
 
   function handleTypeChange(type) {
     onChangeType(type);
@@ -39,8 +45,16 @@ export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) 
     onChangeBody(JSON.stringify([...rows, { key: '', value: '', enabled: true, type: 'text' }]));
   }
 
-  function updateFormRow(index, fields) {
-    const rows = parseFormBody(body).map((r, i) => (i === index ? { ...r, ...fields } : r));
+  // Accepts either a fields object to merge into the row, or an updater function
+  // `(row) => fields` — the latter is resolved against the current bodyRef so
+  // callers resuming after an async gap (e.g. a file read) always operate on the
+  // latest row data rather than a value captured before the async work started.
+  function updateFormRow(index, fieldsOrUpdater) {
+    const rows = parseFormBody(bodyRef.current).map((r, i) => {
+      if (i !== index) return r;
+      const fields = typeof fieldsOrUpdater === 'function' ? fieldsOrUpdater(r) : fieldsOrUpdater;
+      return { ...r, ...fields };
+    });
     onChangeBody(JSON.stringify(rows));
   }
 
@@ -64,6 +78,10 @@ export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) 
   }
 
   function setRowType(index, type) {
+    const rows = parseFormBody(body);
+    const currentType = rows[index]?.type === 'file' ? 'file' : 'text';
+    if (currentType === type) return;
+
     setFileErrors((prev) => {
       const next = { ...prev };
       delete next[index];
@@ -90,7 +108,10 @@ export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) 
 
     try {
       const base64 = await readFileAsBase64(file);
-      updateFormRow(index, { value: base64, fileName: file.name, mimeType: file.type || 'application/octet-stream' });
+      // Use the updater form so this resolves against the row list as of now
+      // (via bodyRef), not the `body` that was in scope when the read started —
+      // guards against overwriting edits made to other rows while reading.
+      updateFormRow(index, () => ({ value: base64, fileName: file.name, mimeType: file.type || 'application/octet-stream' }));
     } catch {
       setFileErrors((prev) => ({ ...prev, [index]: 'Failed to read file' }));
     }
