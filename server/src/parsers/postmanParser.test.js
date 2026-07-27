@@ -43,3 +43,37 @@ test('parsePostmanCollection maps a nested folder request with bearer auth', () 
 test('parsePostmanCollection rejects a non-Postman document', () => {
   assert.throws(() => parsePostmanCollection({ info: {} }), /Not a Postman collection/);
 });
+
+test('parsePostmanCollection normalizes formdata file entries to empty text rows', () => {
+  const collectionWithFormdataFile = {
+    info: {
+      name: 'Upload Collection',
+      schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+    },
+    item: [
+      {
+        name: 'Upload',
+        request: {
+          method: 'POST',
+          url: 'https://example.com/upload',
+          body: {
+            mode: 'formdata',
+            formdata: [
+              { key: 'title', value: 'My Upload', type: 'text' },
+              { key: 'avatar', type: 'file', src: '/local/path/to/avatar.png', disabled: false },
+            ],
+          },
+        },
+      },
+    ],
+  };
+
+  const result = parsePostmanCollection(collectionWithFormdataFile);
+  const req = result.requests[0];
+  assert.equal(req.body_type, 'form');
+  const rows = JSON.parse(req.body);
+  assert.deepEqual(rows, [
+    { key: 'title', value: 'My Upload', type: 'text' },
+    { key: 'avatar', value: '', enabled: true, type: 'text' },
+  ]);
+});

@@ -19,6 +19,22 @@ test('form body with only text rows is sent as urlencoded (unchanged behavior)',
   assert.equal(fetchOptions.body, 'name=Ada');
 });
 
+test('form body with a row missing the type key entirely is still sent as urlencoded (legacy saved requests)', () => {
+  const config = {
+    method: 'POST',
+    url: 'https://example.com',
+    body_type: 'form',
+    body: JSON.stringify([
+      { key: 'name', value: 'Ada', enabled: true },
+    ]),
+  };
+
+  const { fetchOptions } = buildFetchArgs(config);
+
+  assert.equal(fetchOptions.headers['Content-Type'], 'application/x-www-form-urlencoded');
+  assert.equal(fetchOptions.body, 'name=Ada');
+});
+
 test('form body with a file row is sent as multipart/form-data', async () => {
   const config = {
     method: 'POST',
@@ -44,6 +60,30 @@ test('form body with a file row is sent as multipart/form-data', async () => {
   const file = fetchOptions.body.get('avatar');
   assert.equal(file.name, 'hi.txt');
   assert.equal(file.type, 'text/plain');
+  assert.equal(await file.text(), 'hello');
+});
+
+test('form body with a file row missing fileName and mimeType falls back to key and application/octet-stream', async () => {
+  const config = {
+    method: 'POST',
+    url: 'https://example.com',
+    body_type: 'form',
+    body: JSON.stringify([
+      {
+        key: 'avatar',
+        value: Buffer.from('hello').toString('base64'),
+        enabled: true,
+        type: 'file',
+      },
+    ]),
+  };
+
+  const { fetchOptions } = buildFetchArgs(config);
+
+  assert.ok(fetchOptions.body instanceof FormData);
+  const file = fetchOptions.body.get('avatar');
+  assert.equal(file.name, 'avatar');
+  assert.equal(file.type, 'application/octet-stream');
   assert.equal(await file.text(), 'hello');
 });
 
