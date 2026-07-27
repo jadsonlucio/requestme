@@ -75,3 +75,34 @@ test('form body mixing text and file rows sends both as multipart/form-data, exc
   const file = fetchOptions.body.get('avatar');
   assert.equal(await file.text(), 'hello');
 });
+
+test('form body with file row removes Content-Type header regardless of casing', async () => {
+  const config = {
+    method: 'POST',
+    url: 'https://example.com',
+    headers: [
+      { key: 'content-type', value: 'text/plain', enabled: true },
+    ],
+    body_type: 'form',
+    body: JSON.stringify([
+      {
+        key: 'avatar',
+        value: Buffer.from('hello').toString('base64'),
+        enabled: true,
+        type: 'file',
+        fileName: 'hi.txt',
+        mimeType: 'text/plain',
+      },
+    ]),
+  };
+
+  const { fetchOptions } = buildFetchArgs(config);
+
+  assert.ok(fetchOptions.body instanceof FormData);
+  // Verify no Content-Type header exists, regardless of casing
+  assert.equal(
+    Object.keys(fetchOptions.headers).some(k => k.toLowerCase() === 'content-type'),
+    false,
+    'Content-Type header should be removed (case-insensitive)'
+  );
+});

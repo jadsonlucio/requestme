@@ -89,7 +89,11 @@ function buildFetchArgs(config, rangeHeader) {
             formData.append(row.key, row.value || '');
           }
         }
-        delete resolvedHeaders['Content-Type'];
+        // Remove any Content-Type header (case-insensitive) before sending FormData
+        // so fetch() sets multipart/form-data; boundary=... automatically
+        for (const key of Object.keys(resolvedHeaders)) {
+          if (key.toLowerCase() === 'content-type') delete resolvedHeaders[key];
+        }
         fetchOptions.body = formData;
       } else {
         const params = new URLSearchParams();
