@@ -48,8 +48,12 @@ export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) 
     const rows = parseFormBody(body).filter((_, i) => i !== index);
     onChangeBody(JSON.stringify(rows));
     setFileErrors((prev) => {
-      const next = { ...prev };
-      delete next[index];
+      const next = {};
+      for (const [key, msg] of Object.entries(prev)) {
+        const k = Number(key);
+        if (k < index) next[k] = msg;
+        else if (k > index) next[k - 1] = msg;
+      }
       return next;
     });
   }
@@ -84,8 +88,12 @@ export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) 
       return next;
     });
 
-    const base64 = await readFileAsBase64(file);
-    updateFormRow(index, { value: base64, fileName: file.name, mimeType: file.type || 'application/octet-stream' });
+    try {
+      const base64 = await readFileAsBase64(file);
+      updateFormRow(index, { value: base64, fileName: file.name, mimeType: file.type || 'application/octet-stream' });
+    } catch {
+      setFileErrors((prev) => ({ ...prev, [index]: 'Failed to read file' }));
+    }
   }
 
   return (
