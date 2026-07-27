@@ -73,14 +73,34 @@ function buildFetchArgs(config, rangeHeader) {
       resolvedHeaders['Content-Type'] = resolvedHeaders['Content-Type'] || 'application/json';
       fetchOptions.body = body;
     } else if (body_type === 'form') {
-      const params = new URLSearchParams();
       let formRows = [];
       try { formRows = JSON.parse(body); } catch {}
-      for (const row of formRows) {
-        if (row.enabled !== false && row.key) params.append(row.key, row.value || '');
+      const enabledRows = formRows.filter((row) => row.enabled !== false && row.key);
+      const hasFile = enabledRows.some((row) => row.type === 'file');
+
+      if (hasFile) {
+        const formData = new FormData();
+        for (const row of enabledRows) {
+          if (row.type === 'file') {
+            const buffer = Buffer.from(row.value || '', 'base64');
+            const blob = new Blob([buffer], { type: row.mimeType || 'application/octet-stream' });
+            formData.append(row.key, blob, row.fileName || row.key);
+          } else {
+            formData.append(row.key, row.value || '');
+          }
+        }
+        // Remove any Content-Type header (case-insensitive) before sending FormData
+        // so fetch() sets multipart/form-data; boundary=... automatically
+        for (const key of Object.keys(resolvedHeaders)) {
+          if (key.toLowerCase() === 'content-type') delete resolvedHeaders[key];
+        }
+        fetchOptions.body = formData;
+      } else {
+        const params = new URLSearchParams();
+        for (const row of enabledRows) params.append(row.key, row.value || '');
+        resolvedHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+        fetchOptions.body = params.toString();
       }
-      resolvedHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
-      fetchOptions.body = params.toString();
     } else if (body_type === 'raw') {
       fetchOptions.body = body;
     }
@@ -161,3 +181,4 @@ router.get('/preview/:token', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.buildFetchArgs = buildFetchArgs;

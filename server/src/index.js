@@ -9,7 +9,9 @@ const app = express();
 const PORT = 3001;
 
 app.use(cors({ origin: 'http://localhost:5173' }));
-app.use(express.json());
+// Default body-parser limit (100kb) is far too small for a 5MB file that's been
+// base64-inflated (~4/3 larger) plus JSON/row overhead; 20mb leaves comfortable headroom.
+app.use(express.json({ limit: '20mb' }));
 
 app.use('/api', projectsRouter);
 app.use('/api', requestsRouter);

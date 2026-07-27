@@ -47,7 +47,19 @@ function parsePostmanCollection(json) {
         body = JSON.stringify(req.body.urlencoded || []);
       } else if (req.body.mode === 'formdata') {
         body_type = 'form';
-        body = JSON.stringify(req.body.formdata || []);
+        // Postman's own formdata file entries look like { key, type: 'file', src: '/local/path' }
+        // and never embed the file's bytes. Since this app's row contract now gives real
+        // meaning to type: 'file' (server-side: build a real file part from row.value as
+        // base64), leaving those entries verbatim would silently send a 0-byte file. Normalize
+        // them to plain text rows instead (existing behavior for imported file fields),
+        // matching the enabled derivation already used for headers above (`!h.disabled`).
+        const formdataRows = (req.body.formdata || []).map((f) => {
+          if (f.type === 'file') {
+            return { key: f.key, value: '', enabled: !f.disabled, type: 'text' };
+          }
+          return f;
+        });
+        body = JSON.stringify(formdataRows);
       }
     }
 
