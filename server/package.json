@@ -3,7 +3,7 @@
   "scripts": {
     "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 node --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --test src/"
+    "test": "node --test"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
