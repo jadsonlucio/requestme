@@ -414,6 +414,14 @@ export default function BodyTab({ bodyType, body, onChangeType, onChangeBody }) 
 }
 ```
 
+> **Note:** the code sample above is what this task started from; it is no longer
+> what's shipped. Task 2's own review caught two bugs in it and the fixes landed
+> in the actual file: `removeFormRow` now re-maps `fileErrors` keys above the
+> removed index (not a naive `delete next[index]`), and `handleFilePick` now
+> wraps the `await readFileAsBase64(file)` call in a try/catch that sets an
+> inline error on failure. Treat `client/src/components/RequestEditor/BodyTab.jsx`
+> as the source of truth, not this sample — don't copy-paste from here.
+
 - [ ] **Step 2: Manual verification (no client test framework exists in this repo — see Note below)**
 
 1. Start the app: `cd server && npm run dev` (in one terminal), `cd client && npm run dev` (in another).

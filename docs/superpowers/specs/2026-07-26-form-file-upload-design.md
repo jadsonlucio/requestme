@@ -47,8 +47,10 @@ Each form row gets a small Text/File toggle next to the key input.
 - **Text** (default): unchanged key/value text inputs.
 - **File**: the value input is replaced by a "Choose File" button (hidden
   `<input type="file">`, same pattern as the collection-import file input in
-  `client/src/components/Sidebar/Sidebar.jsx`). Once a file is picked, the row
-  shows the filename with a "×" to clear/re-pick.
+  `client/src/components/Sidebar/Sidebar.jsx`). Once a file is picked, the
+  filename is shown next to the "Choose File" button. Picking a new file
+  replaces the current attachment; the row's own remove button clears the
+  whole row, including any attached file.
 
 On file selection:
 
